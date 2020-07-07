@@ -15,6 +15,7 @@ from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import *
 import sys
+from datetime import datetime
 
 # ----------------------------------------------------------------------------#
 # App Config.
@@ -118,8 +119,30 @@ def index():
 def venues():
     # TODO: replace with real venues data.
     #       num_shows should be aggregated based on number of upcoming shows per venue.
-    
-    data = [{
+    states_data = db.session.query(Venue.state, Venue.city).group_by(Venue.state,Venue.city).all()
+    venue_data = {}
+    current_time = datetime.today()
+    for state, city in states_data:
+        if state not in venue_data:
+            venue_data[state]={}
+        venue_data[state][city]=[]
+
+    venue_items = Venue.query.all()
+    for item in venue_items:
+        num_shows = 0
+        for show in item.shows:
+            if show.start_time>current_time:
+              num_shows+=1
+        venue_data[item.state][item.city].append({'id': item.id, 'name': item.name, 'num_upcoming_shows': num_shows})
+
+    #data formating for rendering template
+    data = []
+    for state, city in states_data:
+      data.append({'state': state,
+                    'city': city,
+                    'venues': venue_data[state][city]
+                  })
+    '''data = [{
         "city": "San Francisco",
         "state": "CA",
         "venues": [{
@@ -139,7 +162,7 @@ def venues():
             "name": "The Dueling Pianos Bar",
             "num_upcoming_shows": 0,
         }]
-    }]
+    }]'''
     return render_template('pages/venues.html', areas=data);
 
 
@@ -148,16 +171,36 @@ def search_venues():
     # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
     # seach for Hop should return "The Musical Hop".
     # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
+    search_pattern = request.form['search_term'].strip()
+    venue_items = Venue.query.filter(Venue.name.ilike('%'+search_pattern+'%'))
+    data = []
+    current_time = datetime.today()
+    count=0
+    for item in venue_items:
+        num_shows = 0
+        for show in item.shows:
+            if show.start_time>current_time:
+              num_shows += 1
+        data.append({'id': item.id,
+                      'name': item.name,
+                      'num_upcoming_shows': num_shows
+                    })
+        count += 1
     response = {
+        "count": count,
+        "data": data
+    }
+
+    '''response = {
         "count": 1,
         "data": [{
             "id": 2,
             "name": "The Dueling Pianos Bar",
             "num_upcoming_shows": 0,
         }]
-    }
+    }'''
     return render_template('pages/search_venues.html', results=response,
-                           search_term=request.form.get('search_term', ''))
+                           search_term=search_pattern)
 
 
 @app.route('/venues/<int:venue_id>')
@@ -306,7 +349,9 @@ def delete_venue(venue_id):
 @app.route('/artists')
 def artists():
     # TODO: replace with real data returned from querying the database
-    data = [{
+    data = db.session.query(Artist.id,Artist.name).all()
+    print(data)
+    '''data = [{
         "id": 4,
         "name": "Guns N Petals",
     }, {
@@ -315,7 +360,7 @@ def artists():
     }, {
         "id": 6,
         "name": "The Wild Sax Band",
-    }]
+    }]'''
     return render_template('pages/artists.html', artists=data)
 
 
@@ -324,16 +369,35 @@ def search_artists():
     # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
     # seach for "A" should return "Guns N Petals", "Matt Quevado", and "The Wild Sax Band".
     # search for "band" should return "The Wild Sax Band".
+    search_pattern = request.form['search_term'].strip()
+    artist_items = Artist.query.filter(Artist.name.ilike('%'+ search_pattern +'%'))
+    data = []
+    current_time = datetime.today()
+    count = 0
+    for item in artist_items:
+        num_shows = 0
+        for  show in item.shows:
+            if show.start_time > current_time:
+                num_shows += 1
+        data.append({'id': item.id,
+                     'name': item.name,
+                     'num_upcoming_shows': num_shows
+                    })
+        count += 1
     response = {
+        'count': count,
+        'data': data
+    }
+    '''response = {
         "count": 1,
         "data": [{
             "id": 4,
             "name": "Guns N Petals",
             "num_upcoming_shows": 0,
         }]
-    }
+    }'''
     return render_template('pages/search_artists.html', results=response,
-                           search_term=request.form.get('search_term', ''))
+                           search_term=search_pattern)
 
 
 @app.route('/artists/<int:artist_id>')
