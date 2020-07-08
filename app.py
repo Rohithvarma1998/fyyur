@@ -92,12 +92,12 @@ class Show(db.Model):
 # ----------------------------------------------------------------------------#
 
 def format_datetime(value, format='medium'):
-    date = dateutil.parser.parse(value)
+    date = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
     if format == 'full':
-        format = "EEEE MMMM, d, y 'at' h:mma"
+        format = "%A, %d %B,%Y at %H:%M"
     elif format == 'medium':
-        format = "EE MM, dd, y h:mma"
-    return babel.dates.format_datetime(date, format)
+        format = "%a %b, %d, %y %H:%M"
+    return date.strftime(format)
 
 
 app.jinja_env.filters['datetime'] = format_datetime
@@ -168,9 +168,6 @@ def venues():
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
-    # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
-    # seach for Hop should return "The Musical Hop".
-    # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
     search_pattern = request.form['search_term'].strip()
     venue_items = Venue.query.filter(Venue.name.ilike('%'+search_pattern+'%'))
     data = []
@@ -207,7 +204,42 @@ def search_venues():
 def show_venue(venue_id):
     # shows the venue page with the given venue_id
     # TODO: replace with real venue data from the venues table, using venue_id
-    data1 = {
+    venue_item = Venue.query.get(venue_id)
+    data = {
+        "id": venue_item.id,
+        "name": venue_item.name,
+        "genres": venue_item.genres.split(','),
+        "address": venue_item.address,
+        "city": venue_item.city,
+        "state": venue_item.state,
+        "phone": venue_item.phone,
+        "website": venue_item.website,
+        "facebook_link": venue_item.facebook_link,
+        "seeking_talent": venue_item.seeking_talent,
+        "seeking_description": venue_item.seeking_description,
+        "image_link": venue_item.image_link,
+        "past_shows": [],
+        "upcoming_shows": [],
+        "past_shows_count": 0,
+        "upcoming_shows_count": 0
+    }
+
+    current_time = datetime.now()
+    for show in venue_item.shows:
+        show_data = {
+            "artist_id": show.artist_id,
+            "artist_name": show.artist.name,
+            "artist_image_link": show.artist.image_link,
+            "start_time": str(show.start_time)
+        }
+        if show.start_time>current_time:
+            data['upcoming_shows'].append(show_data)
+            data['upcoming_shows_count']+=1
+        else:
+            data['past_shows'].append(show_data)
+            data['past_shows_count']+=1
+
+    '''data1 = {
         "id": 1,
         "name": "The Musical Hop",
         "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
@@ -284,7 +316,7 @@ def show_venue(venue_id):
         "past_shows_count": 1,
         "upcoming_shows_count": 1,
     }
-    data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]
+    data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]'''
     return render_template('pages/show_venue.html', venue=data)
 
 
@@ -348,7 +380,6 @@ def delete_venue(venue_id):
 #  ----------------------------------------------------------------
 @app.route('/artists')
 def artists():
-    # TODO: replace with real data returned from querying the database
     data = db.session.query(Artist.id,Artist.name).all()
     print(data)
     '''data = [{
@@ -366,9 +397,6 @@ def artists():
 
 @app.route('/artists/search', methods=['POST'])
 def search_artists():
-    # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
-    # seach for "A" should return "Guns N Petals", "Matt Quevado", and "The Wild Sax Band".
-    # search for "band" should return "The Wild Sax Band".
     search_pattern = request.form['search_term'].strip()
     artist_items = Artist.query.filter(Artist.name.ilike('%'+ search_pattern +'%'))
     data = []
@@ -404,7 +432,41 @@ def search_artists():
 def show_artist(artist_id):
     # shows the venue page with the given venue_id
     # TODO: replace with real venue data from the venues table, using venue_id
-    data1 = {
+    artist_item = Artist.query.get(artist_id)
+    data = {
+        "id": artist_item.id,
+        "name": artist_item.name,
+        "genres": artist_item.genres.split(','),
+        "city": artist_item.city,
+        "state": artist_item.state,
+        "phone": artist_item.phone,
+        "website": artist_item.website,
+        "facebook_link": artist_item.facebook_link,
+        "seeking_venue": artist_item.seeking_venue,
+        "seeking_description": artist_item.seeking_description,
+        "image_link": artist_item.image_link,
+        "past_shows": [],
+        "upcoming_shows": [],
+        "past_shows_count": 0,
+        "upcoming_shows_count": 0
+    }
+
+    current_time = datetime.now()
+    for show in artist_item.shows:
+        show_data = {
+            "venue_id": show.venu_id,
+            "venue_name": show.venue.name,
+            "venue_image_link": show.venue.image_link,
+            "start_time": str(show.start_time)
+        }
+        if show.start_time>current_time:
+            data['upcoming_shows'].append(show_data)
+            data['upcoming_shows_count']+=1
+        else:
+            data['past_shows'].append(show_data)
+            data['past_shows_count']+=1
+
+    '''data1 = {
         "id": 4,
         "name": "Guns N Petals",
         "genres": ["Rock n Roll"],
@@ -475,7 +537,8 @@ def show_artist(artist_id):
         "past_shows_count": 0,
         "upcoming_shows_count": 3,
     }
-    data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
+    data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]'''
+    
     return render_template('pages/show_artist.html', artist=data)
 
 
@@ -590,7 +653,20 @@ def shows():
     # displays list of shows at /shows
     # TODO: replace with real venues data.
     #       num_shows should be aggregated based on number of upcoming shows per venue.
-    data = [{
+    curr_time = datetime.today()
+    shows = Show.query.all()
+    data = []
+    for show in shows:
+        data.append({
+            "venue_id": show.venu_id,
+            "venue_name": show.venue.name,
+            "artist_id": show.artist_id,
+            "artist_name": show.artist.name,
+            "artist_image_link": show.artist.image_link,
+            "start_time": str(show.start_time)
+        })
+
+    '''data = [{
         "venue_id": 1,
         "venue_name": "The Musical Hop",
         "artist_id": 4,
@@ -625,7 +701,7 @@ def shows():
         "artist_name": "The Wild Sax Band",
         "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
         "start_time": "2035-04-15T20:00:00.000Z"
-    }]
+    }]'''
     return render_template('pages/shows.html', shows=data)
 
 
